@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Схема этажа школы</title>
+    <style>
+        body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f0f0; }
+        #canvas {
+            background: #fff;
+            border: 2px solid #333;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            cursor: crosshair;
+        }
+            .draw-btn {
+                padding: 12px 32px;
+                font-size: 1.2rem;
+                font-family: inherit;
+                border: none;
+                border-radius: 24px;
+                background: linear-gradient(90deg, #0074D9 0%, #2ECC40 100%);
+                color: #fff;
+                font-weight: bold;
+                box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+                cursor: pointer;
+                transition: background 0.3s, box-shadow 0.2s, transform 0.1s;
+                outline: none;
+                margin-bottom: 10px;
+            }
+            .draw-btn:hover, .draw-btn:focus {
+                background: linear-gradient(90deg, #2ECC40 0%, #0074D9 100%);
+                box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+                transform: translateY(-2px) scale(1.04);
+            }
+            .draw-btn:active {
+                background: linear-gradient(90deg, #0074D9 0%, #2ECC40 100%);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+                transform: scale(0.98);
+            }
+    </style>
+</head>
+<body>
+<div style="display: flex; flex-direction: column; align-items: center; width: 100vw;">
+    <div style="display: flex; flex-direction: row; gap: 24px; width: 100%; justify-content: center; margin-bottom: 8px;">
+        <div style="width: 180px; display: flex; align-items: center; justify-content: center;">
+            <h3 style="text-align:center; margin: 0; font-size: 1.2rem;">Схемы этажей</h3>
+        </div>
+        <div style="width: 800px; display: flex; flex-direction: row; gap: 10px; align-items: center; justify-content: center;">
+            <button id="drawModeBtn" class="draw-btn">Рисовать</button>
+            <button id="saveBtn" class="draw-btn" style="background: linear-gradient(90deg, #FF851B 0%, #FFDC00 100%); color: #222; opacity: 0.5; cursor: not-allowed;">Сохранить</button>
+            <button id="newFloorBtn" class="draw-btn" style="background: linear-gradient(90deg, #B10DC9 0%, #7FDBFF 100%); color: #fff;">Новый</button>
+        </div>
+        <div style="width: 180px; display: flex; align-items: center; justify-content: center;">
+            <h3 style="text-align:center; margin: 0; font-size: 1.2rem;">Датчики</h3>
+        </div>
+    </div>
+    <div style="display: flex; flex-direction: row; gap: 24px; width: 100%; justify-content: center; align-items: flex-start;">
+        <div id="floorListContainer" style="min-width: 180px; height: 600px; display: flex; flex-direction: column; justify-content: flex-start;">
+            <ul id="floorList" style="list-style:none; padding:0; margin:0; overflow-y: auto; flex: 1;"></ul>
+        </div>
+        <canvas id="canvas" width="800" height="600"></canvas>
+        <div id="sensorsListContainer" style="min-width: 180px; height: 600px; display: flex; flex-direction: column; justify-content: flex-start;">
+            <ul id="sensorsList" style="list-style:none; padding:0; margin:0; overflow-y: auto; flex: 1;"></ul>
+        </div>
+    </div>
+</div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let points = [];
+let draggingIdx = null;
+let selectedIdx = null;
+let offset = {x:0, y:0};
+const RADIUS = 8;
+let drawMode = false;
+let editingFloorIdx = null;
+
+let savedFloors = [];
+const floorList = document.getElementById('floorList');
+const sensorsList = document.getElementById('sensorsList');
+const saveBtn = document.getElementById('saveBtn');
+const drawModeBtn = document.getElementById('drawModeBtn');
+
+function updateSaveBtnState() {
+    if (editingFloorIdx !== null) {
+        saveBtn.style.opacity = '1';
+        saveBtn.style.cursor = 'pointer';
+        saveBtn.disabled = false;
+    } else {
+        saveBtn.style.opacity = '0.5';
+        saveBtn.style.cursor = 'not-allowed';
+        saveBtn.disabled = true;
+    }
+}
+
+// Инициализировать с одним пустым этажом по умолчанию
+savedFloors.push([]);
+renderFloorList();
+const newFloorBtn = document.getElementById('newFloorBtn');
+// Кнопка "Новый этаж" — просто очищает холст
+newFloorBtn.addEventListener('click', () => {
+    points = [];
+    selectedIdx = null;
+    draw();
+    editingFloorIdx = null;
+    updateSaveBtnState();
+});
+
+drawModeBtn.addEventListener('click', () => {
+    if (editingFloorIdx === null) {
+        alert('Выберите этаж для редактирования!');
+        return;
+    }
+    drawMode = !drawMode;
+    drawModeBtn.textContent = drawMode ? 'Рисовать: вкл' : 'Рисовать';
+});
+
+saveBtn.addEventListener('click', () => {
+    if (points.length < 3) {
+        alert('Сначала нарисуйте замкнутый контур этажа (минимум 3 точки).');
+        return;
+    }
+    // Сохраняем копию текущих точек
+    const floor = JSON.parse(JSON.stringify(points));
+    savedFloors[editingFloorIdx] = floor;
+    renderFloorList();
+    // Закрываем режим редактирования, но оставляем схему видимой
+    editingFloorIdx = null;
+    drawMode = false;
+    drawModeBtn.textContent = 'Рисовать';
+    selectedIdx = null;
+    draw();
+    updateSaveBtnState();
+});
+
+function renderFloorList() {
+    floorList.innerHTML = '';
+    savedFloors.forEach((floor, idx) => {
+        const li = document.createElement('li');
+        li.style.display = 'flex';
+        li.style.alignItems = 'center';
+        li.style.justifyContent = 'space-between';
+        li.style.padding = '8px 12px';
+        li.style.marginBottom = '6px';
+        li.style.background = '#f7f7f7';
+        li.style.borderRadius = '10px';
+        li.style.cursor = 'pointer';
+        li.style.border = '1px solid #ddd';
+        li.style.position = 'relative';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.textContent = 'Этаж ' + (idx + 1);
+        nameSpan.style.flex = '1';
+        nameSpan.addEventListener('click', () => {
+            points = JSON.parse(JSON.stringify(floor));
+            selectedIdx = null;
+            draw();
+        });
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✎';
+        editBtn.title = 'Редактировать этаж';
+        editBtn.style.display = 'none';
+        editBtn.style.marginLeft = '10px';
+        editBtn.style.background = '#0074D9';
+        editBtn.style.color = '#fff';
+        editBtn.style.border = 'none';
+        editBtn.style.borderRadius = '50%';
+        editBtn.style.width = '28px';
+        editBtn.style.height = '28px';
+        editBtn.style.fontSize = '1.1em';
+        editBtn.style.cursor = 'pointer';
+        editBtn.style.transition = 'background 0.2s';
+        editBtn.addEventListener('mouseenter', () => {
+            editBtn.style.background = '#0055AA';
+        });
+        editBtn.addEventListener('mouseleave', () => {
+            editBtn.style.background = '#0074D9';
+        });
+        editBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            points = JSON.parse(JSON.stringify(floor));
+            selectedIdx = null;
+            editingFloorIdx = idx;
+            drawMode = false;
+            drawModeBtn.textContent = 'Рисовать';
+            draw();
+            updateSaveBtnState();
+        });
+
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '✕';
+        delBtn.title = 'Удалить этаж';
+        delBtn.style.display = 'none';
+        delBtn.style.marginLeft = '10px';
+        delBtn.style.background = '#FF4136';
+        delBtn.style.color = '#fff';
+        delBtn.style.border = 'none';
+        delBtn.style.borderRadius = '50%';
+        delBtn.style.width = '28px';
+        delBtn.style.height = '28px';
+        delBtn.style.fontSize = '1.1em';
+        delBtn.style.cursor = 'pointer';
+        delBtn.style.transition = 'background 0.2s';
+        delBtn.addEventListener('mouseenter', () => {
+            delBtn.style.background = '#c00';
+        });
+        delBtn.addEventListener('mouseleave', () => {
+            delBtn.style.background = '#FF4136';
+        });
+        delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            savedFloors.splice(idx, 1);
+            renderFloorList();
+            // Если удалённый этаж был на холсте, очистить холст
+            if (JSON.stringify(points) === JSON.stringify(floor)) {
+                points = [];
+                selectedIdx = null;
+                draw();
+            }
+        });
+
+        li.appendChild(nameSpan);
+        li.appendChild(editBtn);
+        li.appendChild(delBtn);
+
+        li.addEventListener('mouseenter', () => {
+            editBtn.style.display = 'inline-block';
+            delBtn.style.display = 'inline-block';
+            li.style.background = '#e0e0e0';
+        });
+        li.addEventListener('mouseleave', () => {
+            editBtn.style.display = 'none';
+            delBtn.style.display = 'none';
+            li.style.background = '#f7f7f7';
+        });
+
+        floorList.appendChild(li);
+    });
+}
+
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw lines
+    if (points.length > 1) {
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+            ctx.lineTo(points[i].x, points[i].y);
+        }
+        if (points.length > 2) {
+            ctx.lineTo(points[0].x, points[0].y); // close contour
+        }
+        // В режиме редактирования синие линии, иначе черные
+        ctx.strokeStyle = editingFloorIdx !== null ? '#0074D9' : '#000';
+        ctx.lineWidth = 6; // потолще
+        ctx.stroke();
+    }
+    // Draw points (squares) только в режиме редактирования
+    if (editingFloorIdx !== null) {
+        for (let i = 0; i < points.length; i++) {
+            const p = points[i];
+            let size = RADIUS * 2;
+            let half = RADIUS;
+            ctx.beginPath();
+            if (i === selectedIdx) {
+                ctx.fillStyle = '#2ECC40'; // выделенная точка — зелёная
+            } else {
+                ctx.fillStyle = '#FF4136';
+            }
+            ctx.fillRect(p.x - half, p.y - half, size, size);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(p.x - half, p.y - half, size, size);
+            if (i === selectedIdx) {
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = '#2ECC40';
+                ctx.strokeRect(p.x - half - 4, p.y - half - 4, size + 8, size + 8);
+            }
+        }
+    }
+}
+
+function getPointIdx(x, y) {
+    return points.findIndex(p => (p.x - x) ** 2 + (p.y - y) ** 2 < RADIUS ** 2);
+}
+
+canvas.addEventListener('mousedown', e => {
+    const rect = canvas.getBoundingClientRect();
+    let x = e.clientX - rect.left;
+    let y = e.clientY - rect.top;
+    const idx = getPointIdx(x, y);
+    if (idx !== -1) {
+        draggingIdx = idx;
+        selectedIdx = idx;
+        offset.x = points[idx].x - x;
+        offset.y = points[idx].y - y;
+        draw();
+    } else if (drawMode && editingFloorIdx !== null && (points.length === 0 || !isContourClosed())) {
+        // Если это не первая точка, корректируем координаты для перпендикулярности
+        if (points.length > 0) {
+            const prev = points[points.length - 1];
+            // Определяем, по какой оси ближе — по X или по Y
+            if (Math.abs(x - prev.x) < Math.abs(y - prev.y)) {
+                x = prev.x; // вертикальная линия
+            } else {
+                y = prev.y; // горизонтальная линия
+            }
+        }
+        points.push({x, y});
+        selectedIdx = points.length - 1;
+        draw();
+    } else {
+        selectedIdx = null;
+        draw();
+    }
+});
+
+canvas.addEventListener('mousemove', e => {
+    if (draggingIdx !== null && editingFloorIdx !== null) {
+        const rect = canvas.getBoundingClientRect();
+        let x = e.clientX - rect.left + offset.x;
+        let y = e.clientY - rect.top + offset.y;
+
+        // Перемещать можно в любое место, но если X или Y совпадает с другой точкой — прилипание
+        const SNAP_DIST = 15;
+        for (let i = 0; i < points.length; i++) {
+            if (i === draggingIdx) continue;
+            if (Math.abs(x - points[i].x) < SNAP_DIST) {
+                x = points[i].x;
+            }
+            if (Math.abs(y - points[i].y) < SNAP_DIST) {
+                y = points[i].y;
+            }
+        }
+
+        points[draggingIdx] = {x, y};
+        draw();
+    }
+});
+
+canvas.addEventListener('mouseup', () => {
+    draggingIdx = null;
+});
+
+// Удаление выделенной точки по клавише Delete
+document.addEventListener('keydown', e => {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIdx !== null) {
+        points.splice(selectedIdx, 1);
+        selectedIdx = null;
+        draw();
+    }
+});
+
+canvas.addEventListener('mouseleave', () => {
+    draggingIdx = null;
+});
+
+function isContourClosed() {
+    if (points.length < 3) return false;
+    const first = points[0];
+    const last = points[points.length - 1];
+    // Контур замкнут, если последняя точка совпадает с первой (или очень близко)
+    return Math.hypot(first.x - last.x, first.y - last.y) < RADIUS * 2;
+}
+
+draw();
+updateSaveBtnState();
+
+// --- Асинхронный опрос сервера для датчиков ---
+const SCHOOL_ID = 'school_1'; // id школы, для теста
+const API_URL = 'http://localhost:5000/sensor-data';
+const JWT_TOKEN = ''; // сюда можно вставить токен, если потребуется
+
+function fetchSensors() {
+    fetch(API_URL + '?sensor_id=', {
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer ' + JWT_TOKEN
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        updateSensorsList(data.data);
+    })
+    .catch(err => {
+        sensorsList.innerHTML = '<li style="color:red;">Ошибка получения данных</li>';
+    });
+}
+
+function updateSensorsList(sensorsData) {
+    sensorsList.innerHTML = '';
+    if (!sensorsData || Object.keys(sensorsData).length === 0) {
+        sensorsList.innerHTML = '<li style="color:#888;">Нет данных</li>';
+        return;
+    }
+    Object.entries(sensorsData).forEach(([sensorId, queue]) => {
+        let last = queue.length ? queue[queue.length-1] : null;
+        let value = last ? last.value : '—';
+        let time = last ? new Date(last.timestamp*1000).toLocaleTimeString() : '';
+        const li = document.createElement('li');
+        li.style.padding = '8px 12px';
+        li.style.marginBottom = '6px';
+        li.style.background = '#f7f7f7';
+        li.style.borderRadius = '10px';
+        li.style.border = '1px solid #ddd';
+        li.textContent = `${sensorId}: ${value}°C ${time}`;
+        sensorsList.appendChild(li);
+    });
+}
+
+// Запуск периодического опроса
+setInterval(fetchSensors, 2000);
+fetchSensors();
+</script>
+</body>
+</html>
