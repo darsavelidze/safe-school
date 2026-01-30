@@ -2,309 +2,1412 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Схема этажа школы</title>
+    <title>Мониторинг школы - MARGARITA</title>
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <style>
-        body { display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f0f0; }
-        #canvas {
-            background: #fff;
-            border: 2px solid #333;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            cursor: crosshair;
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif;
+            margin: 0; 
+            padding: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
-            .draw-btn {
-                padding: 12px 32px;
-                font-size: 1.2rem;
-                font-family: inherit;
-                border: none;
-                border-radius: 24px;
-                background: linear-gradient(90deg, #0074D9 0%, #2ECC40 100%);
-                color: #fff;
-                font-weight: bold;
-                box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-                cursor: pointer;
-                transition: background 0.3s, box-shadow 0.2s, transform 0.1s;
-                outline: none;
-                margin-bottom: 10px;
-            }
-            .draw-btn:hover, .draw-btn:focus {
-                background: linear-gradient(90deg, #2ECC40 0%, #0074D9 100%);
-                box-shadow: 0 6px 24px rgba(0,0,0,0.18);
-                transform: translateY(-2px) scale(1.04);
-            }
-            .draw-btn:active {
-                background: linear-gradient(90deg, #0074D9 0%, #2ECC40 100%);
-                box-shadow: 0 2px 8px rgba(0,0,0,0.10);
-                transform: scale(0.98);
-            }
+        
+        /* --- Экран авторизации --- */
+        #authScreen {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .auth-container {
+            background: #fff;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+        .auth-container h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .auth-tabs {
+            display: flex;
+            margin-bottom: 20px;
+        }
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: #f0f0f0;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        .auth-tab:first-child { border-radius: 10px 0 0 10px; }
+        .auth-tab:last-child { border-radius: 0 10px 10px 0; }
+        .auth-tab.active {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            color: #fff;
+        }
+        .auth-form { display: none; }
+        .auth-form.active { display: block; }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 500;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .auth-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            color: #fff;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .auth-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        .auth-error {
+            color: #e74c3c;
+            text-align: center;
+            margin-top: 15px;
+        }
+        
+        /* --- Главный экран --- */
+        #mainScreen {
+            display: none;
+            flex-direction: column;
+            min-height: 100vh;
+            background: #f0f0f0;
+        }
+        .header {
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            color: #fff;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header h1 { margin: 0; font-size: 1.5rem; }
+        .header-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .logout-btn {
+            padding: 8px 20px;
+            border: 2px solid #fff;
+            border-radius: 20px;
+            background: transparent;
+            color: #fff;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        .logout-btn:hover {
+            background: #fff;
+            color: #667eea;
+        }
+        
+        .main-content {
+            display: flex;
+            flex: 1;
+            padding: 20px;
+            gap: 20px;
+        }
+        
+        /* --- Панели --- */
+        .side-panel {
+            width: 200px;
+            background: #fff;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .side-panel h3 {
+            margin: 0 0 15px 0;
+            color: #333;
+            font-size: 1rem;
+            text-align: center;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        .panel-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        
+        /* --- Канвас --- */
+        .canvas-container {
+            flex: 1;
+            background: #fff;
+            border-radius: 15px;
+            padding: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .canvas-toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .toolbar-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .toolbar-btn.primary {
+            background: linear-gradient(90deg, #0074D9, #2ECC40);
+            color: #fff;
+        }
+        .toolbar-btn.secondary {
+            background: linear-gradient(90deg, #FF851B, #FFDC00);
+            color: #222;
+        }
+        .toolbar-btn.danger {
+            background: linear-gradient(90deg, #FF4136, #FF851B);
+            color: #fff;
+        }
+        .toolbar-btn:hover { transform: scale(1.05); }
+        .toolbar-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        
+        .map-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-left: auto;
+            padding: 8px 15px;
+            background: #f0f0f0;
+            border-radius: 20px;
+        }
+        .map-toggle label { cursor: pointer; font-size: 0.9rem; }
+        
+        #canvas {
+            width: 900px;
+            height: 600px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            cursor: crosshair;
+            background: #fafafa;
+        }
+        
+        /* --- Элементы списков --- */
+        .floor-item, .sensor-item, .camera-item {
+            padding: 10px 12px;
+            margin-bottom: 8px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+        .floor-item {
+            background: #f7f7f7;
+            border: 1px solid #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .floor-item:hover { background: #e8e8e8; }
+        .floor-item.active {
+            background: #d0e8ff;
+            border-color: #0074D9;
+        }
+        .floor-item .floor-btns {
+            display: none;
+            gap: 5px;
+        }
+        .floor-item:hover .floor-btns { display: flex; }
+        .floor-btn {
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            color: #fff;
+        }
+        .floor-btn.edit { background: #0074D9; }
+        .floor-btn.delete { background: #FF4136; }
+        
+        .sensor-item {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: #fff;
+            font-weight: 500;
+        }
+        .sensor-item:hover { transform: scale(1.02); }
+        .sensor-item.placed {
+            background: linear-gradient(135deg, #11998e, #38ef7d);
+            opacity: 0.8;
+        }
+        .sensor-item .remove-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 20px;
+            height: 20px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+            display: none;
+        }
+        .sensor-item:hover .remove-btn { display: block; }
+        
+        .camera-item {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: #fff;
+            font-weight: 500;
+        }
+        .camera-item.placed {
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
+        }
+        .camera-item .remove-btn {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            width: 20px;
+            height: 20px;
+            border: none;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.3);
+            color: #fff;
+            cursor: pointer;
+            font-size: 12px;
+            display: none;
+        }
+        .camera-item:hover .remove-btn { display: block; }
+        
+        /* --- Секции датчиков/камер --- */
+        .section-title {
+            font-size: 0.85rem;
+            color: #666;
+            margin: 15px 0 10px 0;
+            padding-bottom: 5px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        /* --- Модальное окно для видео --- */
+        .video-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+        .video-modal.active {
+            display: flex;
+        }
+        .video-modal-content {
+            background: #1a1a2e;
+            border-radius: 15px;
+            padding: 20px;
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+        }
+        .video-modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            color: #fff;
+        }
+        .video-modal-header h3 {
+            margin: 0;
+            font-size: 1.3rem;
+        }
+        .video-modal-close {
+            background: #e74c3c;
+            border: none;
+            color: #fff;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 1.2rem;
+            transition: transform 0.2s;
+        }
+        .video-modal-close:hover {
+            transform: scale(1.1);
+        }
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .video-frame {
+            max-width: 800px;
+            max-height: 600px;
+            display: block;
+        }
+        .video-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 15px;
+            padding: 10px 15px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            color: #fff;
+        }
+        .video-stat {
+            text-align: center;
+        }
+        .video-stat-value {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #2ecc71;
+        }
+        .video-stat-label {
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+        .video-no-frame {
+            width: 640px;
+            height: 480px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #666;
+            font-size: 1.2rem;
+        }
+        .watch-btn {
+            background: linear-gradient(90deg, #3498db, #2980b9);
+            border: none;
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            margin-top: 5px;
+        }
+        .watch-btn:hover {
+            background: linear-gradient(90deg, #2980b9, #1a5276);
+        }
     </style>
 </head>
 <body>
-<div style="display: flex; flex-direction: column; align-items: center; width: 100vw;">
-    <div style="display: flex; flex-direction: row; gap: 24px; width: 100%; justify-content: center; margin-bottom: 8px;">
-        <div style="width: 180px; display: flex; align-items: center; justify-content: center;">
-            <h3 style="text-align:center; margin: 0; font-size: 1.2rem;">Схемы этажей</h3>
+
+<!-- Экран авторизации -->
+<div id="authScreen">
+    <div class="auth-container">
+        <h1>🏫 MARGARITA</h1>
+        <div class="auth-tabs">
+            <button class="auth-tab active" data-tab="login">Вход</button>
+            <button class="auth-tab" data-tab="register">Регистрация</button>
         </div>
-        <div style="width: 800px; display: flex; flex-direction: row; gap: 10px; align-items: center; justify-content: center;">
-            <button id="drawModeBtn" class="draw-btn">Рисовать</button>
-            <button id="saveBtn" class="draw-btn" style="background: linear-gradient(90deg, #FF851B 0%, #FFDC00 100%); color: #222; opacity: 0.5; cursor: not-allowed;">Сохранить</button>
-            <button id="newFloorBtn" class="draw-btn" style="background: linear-gradient(90deg, #B10DC9 0%, #7FDBFF 100%); color: #fff;">Новый</button>
-        </div>
-        <div style="width: 180px; display: flex; align-items: center; justify-content: center;">
-            <h3 style="text-align:center; margin: 0; font-size: 1.2rem;">Датчики</h3>
-        </div>
+        
+        <form id="loginForm" class="auth-form active">
+            <div class="form-group">
+                <label>ID Школы</label>
+                <input type="text" id="loginSchoolId" placeholder="school_1" required>
+            </div>
+            <div class="form-group">
+                <label>Пароль</label>
+                <input type="password" id="loginPassword" placeholder="••••••" required>
+            </div>
+            <button type="submit" class="auth-btn">Войти</button>
+            <div class="auth-error" id="loginError"></div>
+        </form>
+        
+        <form id="registerForm" class="auth-form">
+            <div class="form-group">
+                <label>ID Школы (уникальный)</label>
+                <input type="text" id="regSchoolId" placeholder="school_1" required>
+            </div>
+            <div class="form-group">
+                <label>Название школы</label>
+                <input type="text" id="regSchoolName" placeholder="Школа №1">
+            </div>
+            <div class="form-group">
+                <label>Пароль</label>
+                <input type="password" id="regPassword" placeholder="••••••" required>
+            </div>
+            <button type="submit" class="auth-btn">Зарегистрироваться</button>
+            <div class="auth-error" id="registerError"></div>
+        </form>
     </div>
-    <div style="display: flex; flex-direction: row; gap: 24px; width: 100%; justify-content: center; align-items: flex-start;">
-        <div id="floorListContainer" style="min-width: 180px; height: 600px; display: flex; flex-direction: column; justify-content: flex-start;">
-            <ul id="floorList" style="list-style:none; padding:0; margin:0; overflow-y: auto; flex: 1;"></ul>
+</div>
+
+<!-- Главный экран -->
+<div id="mainScreen">
+    <header class="header">
+        <h1>🏫 MARGARITA - Мониторинг школы</h1>
+        <div class="header-info">
+            <span id="schoolName">Школа</span>
+            <button class="logout-btn" id="logoutBtn">Выйти</button>
         </div>
-        <canvas id="canvas" width="800" height="600"></canvas>
-        <div id="sensorsListContainer" style="min-width: 180px; height: 600px; display: flex; flex-direction: column; justify-content: flex-start;">
-            <ul id="sensorsList" style="list-style:none; padding:0; margin:0; overflow-y: auto; flex: 1;"></ul>
+    </header>
+    
+    <div class="main-content">
+        <!-- Левая панель: Этажи -->
+        <div class="side-panel">
+            <h3>📐 Этажи</h3>
+            <ul id="floorList" class="panel-list"></ul>
+            <button class="toolbar-btn primary" id="newFloorBtn" style="width:100%; margin-top:10px;">+ Новый этаж</button>
+        </div>
+        
+        <!-- Центр: Канвас -->
+        <div class="canvas-container">
+            <div class="canvas-toolbar">
+                <button class="toolbar-btn primary" id="drawModeBtn">✏️ Рисовать</button>
+                <button class="toolbar-btn secondary" id="saveBtn" disabled>💾 Сохранить</button>
+                
+                <div class="map-toggle">
+                    <input type="checkbox" id="heatmapToggle" checked>
+                    <label for="heatmapToggle">🌡️ Температура</label>
+                </div>
+                <div class="map-toggle">
+                    <input type="checkbox" id="densityToggle" checked>
+                    <label for="densityToggle">👥 Плотность</label>
+                </div>
+            </div>
+            <canvas id="canvas" width="900" height="600"></canvas>
+        </div>
+        
+        <!-- Правая панель: Датчики и Камеры -->
+        <div class="side-panel">
+            <h3>📡 Устройства</h3>
+            
+            <div class="section-title">🌡️ Датчики температуры</div>
+            <ul id="sensorsList" class="panel-list"></ul>
+            
+            <div class="section-title">📹 Камеры</div>
+            <ul id="camerasList" class="panel-list"></ul>
         </div>
     </div>
 </div>
+
+<!-- Модальное окно для просмотра видео с камеры -->
+<div id="videoModal" class="video-modal">
+    <div class="video-modal-content">
+        <div class="video-modal-header">
+            <h3>📹 <span id="videoModalCameraId">Камера</span></h3>
+            <button class="video-modal-close" id="closeVideoModal">✕</button>
+        </div>
+        <div class="video-container">
+            <img id="videoFrame" class="video-frame" alt="Video Stream">
+            <div id="videoNoFrame" class="video-no-frame">
+                ⏳ Ожидание видеопотока...
+            </div>
+        </div>
+        <div class="video-stats">
+            <div class="video-stat">
+                <div class="video-stat-value" id="videoPersonCount">0</div>
+                <div class="video-stat-label">Обнаружено людей</div>
+            </div>
+            <div class="video-stat">
+                <div class="video-stat-value" id="videoFps">-</div>
+                <div class="video-stat-label">Обновлений/сек</div>
+            </div>
+            <div class="video-stat">
+                <div class="video-stat-value" id="videoLastUpdate">-</div>
+                <div class="video-stat-label">Последнее обновление</div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+// --- Конфигурация ---
+const API_URL = 'http://localhost:5000';
+let JWT_TOKEN = '';
+let SCHOOL_ID = '';
+let SCHOOL_NAME = '';
+let socket = null;
+
+// --- Состояние приложения ---
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
+
 let points = [];
+let savedFloors = [];
+let currentViewFloorIdx = null;
+let editingFloorIdx = null;
+let drawMode = false;
 let draggingIdx = null;
 let selectedIdx = null;
-let offset = {x:0, y:0};
+let offset = {x: 0, y: 0};
+
 const RADIUS = 8;
-let drawMode = false;
-let editingFloorIdx = null;
+const SENSOR_RADIUS = 14;
+const CAMERA_RADIUS = 18;
 
-let savedFloors = [];
-const floorList = document.getElementById('floorList');
-const sensorsList = document.getElementById('sensorsList');
-const saveBtn = document.getElementById('saveBtn');
-const drawModeBtn = document.getElementById('drawModeBtn');
+// Данные датчиков и камер
+let sensorsData = {};
+let camerasData = {};
+let sensorPositions = {};
+let cameraPositions = {};
 
-function updateSaveBtnState() {
-    if (editingFloorIdx !== null) {
-        saveBtn.style.opacity = '1';
-        saveBtn.style.cursor = 'pointer';
-        saveBtn.disabled = false;
-    } else {
-        saveBtn.style.opacity = '0.5';
-        saveBtn.style.cursor = 'not-allowed';
-        saveBtn.disabled = true;
+// Перетаскивание устройств
+let draggingDevice = null;
+let draggingDeviceType = null;
+let draggingDeviceOffset = {x: 0, y: 0};
+
+// --- Авторизация ---
+document.querySelectorAll('.auth-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(tab.dataset.tab + 'Form').classList.add('active');
+    });
+});
+
+document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const schoolId = document.getElementById('loginSchoolId').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    
+    try {
+        const resp = await fetch(`${API_URL}/login`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({school_id: schoolId, password: password})
+        });
+        const data = await resp.json();
+        
+        if (resp.ok) {
+            JWT_TOKEN = data.token;
+            SCHOOL_ID = data.school_id;
+            SCHOOL_NAME = data.name || schoolId;
+            localStorage.setItem('jwt_token', JWT_TOKEN);
+            localStorage.setItem('school_id', SCHOOL_ID);
+            localStorage.setItem('school_name', SCHOOL_NAME);
+            showMainScreen();
+        } else {
+            document.getElementById('loginError').textContent = data.error || 'Ошибка входа';
+        }
+    } catch (err) {
+        document.getElementById('loginError').textContent = 'Сервер недоступен';
+    }
+});
+
+document.getElementById('registerForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const schoolId = document.getElementById('regSchoolId').value.trim();
+    const schoolName = document.getElementById('regSchoolName').value.trim();
+    const password = document.getElementById('regPassword').value;
+    
+    try {
+        const resp = await fetch(`${API_URL}/register`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({school_id: schoolId, name: schoolName, password: password})
+        });
+        const data = await resp.json();
+        
+        if (resp.ok) {
+            JWT_TOKEN = data.token;
+            SCHOOL_ID = data.school_id;
+            SCHOOL_NAME = schoolName || schoolId;
+            localStorage.setItem('jwt_token', JWT_TOKEN);
+            localStorage.setItem('school_id', SCHOOL_ID);
+            localStorage.setItem('school_name', SCHOOL_NAME);
+            showMainScreen();
+        } else {
+            document.getElementById('registerError').textContent = data.error || 'Ошибка регистрации';
+        }
+    } catch (err) {
+        document.getElementById('registerError').textContent = 'Сервер недоступен';
+    }
+});
+
+document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.clear();
+    JWT_TOKEN = '';
+    SCHOOL_ID = '';
+    if (socket) socket.disconnect();
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('mainScreen').style.display = 'none';
+});
+
+function apiHeaders() {
+    return {'Authorization': 'Bearer ' + JWT_TOKEN, 'Content-Type': 'application/json'};
+}
+
+async function showMainScreen() {
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('mainScreen').style.display = 'flex';
+    document.getElementById('schoolName').textContent = SCHOOL_NAME;
+    
+    // Подключаем WebSocket
+    connectWebSocket();
+    
+    // Загружаем данные
+    await loadFloors();
+    await loadSensorPositions();
+    await loadCameraPositions();
+    
+    if (savedFloors.length > 0) {
+        currentViewFloorIdx = 0;
+        points = JSON.parse(JSON.stringify(savedFloors[0] || []));
+    }
+    
+    renderFloorList();
+    draw();
+    updateSaveBtnState();
+    fetchSensors();
+    fetchCameras();
+    
+    setInterval(fetchSensors, 2000);
+    setInterval(fetchCameras, 2000);
+}
+
+function connectWebSocket() {
+    socket = io(API_URL);
+    
+    socket.on('connect', () => {
+        console.log('WebSocket connected');
+        socket.emit('subscribe', {school_id: SCHOOL_ID});
+    });
+    
+    socket.on('camera_update', (data) => {
+        if (data.school_id === SCHOOL_ID) {
+            camerasData[data.camera_id] = {
+                count: data.count,
+                timestamp: data.timestamp
+            };
+            updateCamerasList();
+            draw();
+        }
+    });
+    
+    // Обработка кадров для видео просмотра
+    socket.on('camera_frame', (data) => {
+        if (data.school_id === SCHOOL_ID && data.camera_id === currentWatchingCamera) {
+            updateVideoFrame(data);
+        }
+    });
+}
+
+// --- API функции ---
+async function loadFloors() {
+    try {
+        const resp = await fetch(`${API_URL}/floors`, {headers: apiHeaders()});
+        const data = await resp.json();
+        savedFloors = data.floors && data.floors.length > 0 ? data.floors : [[]];
+    } catch (e) {
+        console.error('Error loading floors:', e);
+        savedFloors = [[]];
     }
 }
 
-// Инициализировать с одним пустым этажом по умолчанию
-savedFloors.push([]);
-renderFloorList();
-const newFloorBtn = document.getElementById('newFloorBtn');
-// Кнопка "Новый этаж" — просто очищает холст
-newFloorBtn.addEventListener('click', () => {
-    points = [];
-    selectedIdx = null;
-    draw();
-    editingFloorIdx = null;
-    updateSaveBtnState();
-});
-
-drawModeBtn.addEventListener('click', () => {
-    if (editingFloorIdx === null) {
-        alert('Выберите этаж для редактирования!');
-        return;
+async function saveFloorsToServer() {
+    try {
+        await fetch(`${API_URL}/floors`, {
+            method: 'POST',
+            headers: apiHeaders(),
+            body: JSON.stringify({floors: savedFloors})
+        });
+    } catch (e) {
+        console.error('Error saving floors:', e);
     }
-    drawMode = !drawMode;
-    drawModeBtn.textContent = drawMode ? 'Рисовать: вкл' : 'Рисовать';
-});
+}
 
-saveBtn.addEventListener('click', () => {
-    if (points.length < 3) {
-        alert('Сначала нарисуйте замкнутый контур этажа (минимум 3 точки).');
-        return;
+async function loadSensorPositions() {
+    try {
+        const resp = await fetch(`${API_URL}/sensor-positions`, {headers: apiHeaders()});
+        const data = await resp.json();
+        sensorPositions = {};
+        if (data.positions) {
+            for (const [floorIdx, sensors] of Object.entries(data.positions)) {
+                sensorPositions[parseInt(floorIdx)] = sensors;
+            }
+        }
+    } catch (e) {
+        console.error('Error loading sensor positions:', e);
     }
-    // Сохраняем копию текущих точек
-    const floor = JSON.parse(JSON.stringify(points));
-    savedFloors[editingFloorIdx] = floor;
-    renderFloorList();
-    // Закрываем режим редактирования, но оставляем схему видимой
-    editingFloorIdx = null;
-    drawMode = false;
-    drawModeBtn.textContent = 'Рисовать';
-    selectedIdx = null;
-    draw();
-    updateSaveBtnState();
-});
+}
+
+async function saveSensorPositionsToServer(floorIdx) {
+    try {
+        await fetch(`${API_URL}/sensor-positions`, {
+            method: 'POST',
+            headers: apiHeaders(),
+            body: JSON.stringify({floor_idx: floorIdx, positions: sensorPositions[floorIdx] || {}})
+        });
+    } catch (e) {
+        console.error('Error saving sensor positions:', e);
+    }
+}
+
+async function loadCameraPositions() {
+    try {
+        const resp = await fetch(`${API_URL}/camera-positions`, {headers: apiHeaders()});
+        const data = await resp.json();
+        cameraPositions = {};
+        if (data.positions) {
+            for (const [floorIdx, cameras] of Object.entries(data.positions)) {
+                cameraPositions[parseInt(floorIdx)] = cameras;
+            }
+        }
+    } catch (e) {
+        console.error('Error loading camera positions:', e);
+    }
+}
+
+async function saveCameraPositionsToServer(floorIdx) {
+    try {
+        await fetch(`${API_URL}/camera-positions`, {
+            method: 'POST',
+            headers: apiHeaders(),
+            body: JSON.stringify({floor_idx: floorIdx, positions: cameraPositions[floorIdx] || {}})
+        });
+    } catch (e) {
+        console.error('Error saving camera positions:', e);
+    }
+}
+
+async function fetchSensors() {
+    try {
+        const resp = await fetch(`${API_URL}/sensor-data`, {headers: apiHeaders()});
+        const data = await resp.json();
+        if (data.data) {
+            sensorsData = {};
+            for (const [sensorId, queue] of Object.entries(data.data)) {
+                const last = queue.length ? queue[queue.length - 1] : null;
+                sensorsData[sensorId] = last ? {value: last.value, timestamp: last.timestamp} : null;
+            }
+            updateSensorsList();
+            draw();
+        }
+    } catch (e) {
+        console.error('Error fetching sensors:', e);
+    }
+}
+
+async function fetchCameras() {
+    try {
+        const resp = await fetch(`${API_URL}/camera-data`, {headers: apiHeaders()});
+        const data = await resp.json();
+        if (data.data) {
+            for (const [cameraId, camData] of Object.entries(data.data)) {
+                camerasData[cameraId] = camData;
+            }
+            updateCamerasList();
+            draw();
+        }
+    } catch (e) {
+        console.error('Error fetching cameras:', e);
+    }
+}
+
+// --- UI обновления ---
+function updateSaveBtnState() {
+    const saveBtn = document.getElementById('saveBtn');
+    saveBtn.disabled = editingFloorIdx === null;
+}
 
 function renderFloorList() {
+    const floorList = document.getElementById('floorList');
     floorList.innerHTML = '';
+    
     savedFloors.forEach((floor, idx) => {
         const li = document.createElement('li');
-        li.style.display = 'flex';
-        li.style.alignItems = 'center';
-        li.style.justifyContent = 'space-between';
-        li.style.padding = '8px 12px';
-        li.style.marginBottom = '6px';
-        li.style.background = '#f7f7f7';
-        li.style.borderRadius = '10px';
-        li.style.cursor = 'pointer';
-        li.style.border = '1px solid #ddd';
-        li.style.position = 'relative';
-
-        const nameSpan = document.createElement('span');
-        nameSpan.textContent = 'Этаж ' + (idx + 1);
-        nameSpan.style.flex = '1';
-        nameSpan.addEventListener('click', () => {
+        li.className = 'floor-item' + (currentViewFloorIdx === idx ? ' active' : '');
+        li.innerHTML = `
+            <span>Этаж ${idx + 1}</span>
+            <div class="floor-btns">
+                <button class="floor-btn edit" title="Редактировать">✎</button>
+                <button class="floor-btn delete" title="Удалить">✕</button>
+            </div>
+        `;
+        
+        li.querySelector('span').addEventListener('click', () => {
             points = JSON.parse(JSON.stringify(floor));
-            selectedIdx = null;
-            draw();
-        });
-
-        const editBtn = document.createElement('button');
-        editBtn.textContent = '✎';
-        editBtn.title = 'Редактировать этаж';
-        editBtn.style.display = 'none';
-        editBtn.style.marginLeft = '10px';
-        editBtn.style.background = '#0074D9';
-        editBtn.style.color = '#fff';
-        editBtn.style.border = 'none';
-        editBtn.style.borderRadius = '50%';
-        editBtn.style.width = '28px';
-        editBtn.style.height = '28px';
-        editBtn.style.fontSize = '1.1em';
-        editBtn.style.cursor = 'pointer';
-        editBtn.style.transition = 'background 0.2s';
-        editBtn.addEventListener('mouseenter', () => {
-            editBtn.style.background = '#0055AA';
-        });
-        editBtn.addEventListener('mouseleave', () => {
-            editBtn.style.background = '#0074D9';
-        });
-        editBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            points = JSON.parse(JSON.stringify(floor));
-            selectedIdx = null;
-            editingFloorIdx = idx;
+            currentViewFloorIdx = idx;
+            editingFloorIdx = null;
             drawMode = false;
-            drawModeBtn.textContent = 'Рисовать';
+            document.getElementById('drawModeBtn').textContent = '✏️ Рисовать';
+            renderFloorList();
+            updateSensorsList();
+            updateCamerasList();
             draw();
             updateSaveBtnState();
         });
-
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '✕';
-        delBtn.title = 'Удалить этаж';
-        delBtn.style.display = 'none';
-        delBtn.style.marginLeft = '10px';
-        delBtn.style.background = '#FF4136';
-        delBtn.style.color = '#fff';
-        delBtn.style.border = 'none';
-        delBtn.style.borderRadius = '50%';
-        delBtn.style.width = '28px';
-        delBtn.style.height = '28px';
-        delBtn.style.fontSize = '1.1em';
-        delBtn.style.cursor = 'pointer';
-        delBtn.style.transition = 'background 0.2s';
-        delBtn.addEventListener('mouseenter', () => {
-            delBtn.style.background = '#c00';
-        });
-        delBtn.addEventListener('mouseleave', () => {
-            delBtn.style.background = '#FF4136';
-        });
-        delBtn.addEventListener('click', (e) => {
+        
+        li.querySelector('.edit').addEventListener('click', (e) => {
             e.stopPropagation();
-            savedFloors.splice(idx, 1);
+            points = JSON.parse(JSON.stringify(floor));
+            currentViewFloorIdx = idx;
+            editingFloorIdx = idx;
+            drawMode = false;
+            document.getElementById('drawModeBtn').textContent = '✏️ Рисовать';
             renderFloorList();
-            // Если удалённый этаж был на холсте, очистить холст
-            if (JSON.stringify(points) === JSON.stringify(floor)) {
-                points = [];
-                selectedIdx = null;
-                draw();
+            draw();
+            updateSaveBtnState();
+        });
+        
+        li.querySelector('.delete').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (savedFloors.length <= 1) {
+                alert('Нельзя удалить последний этаж');
+                return;
             }
+            savedFloors.splice(idx, 1);
+            delete sensorPositions[idx];
+            delete cameraPositions[idx];
+            if (currentViewFloorIdx >= savedFloors.length) {
+                currentViewFloorIdx = savedFloors.length - 1;
+            }
+            points = JSON.parse(JSON.stringify(savedFloors[currentViewFloorIdx] || []));
+            renderFloorList();
+            saveFloorsToServer();
+            draw();
         });
-
-        li.appendChild(nameSpan);
-        li.appendChild(editBtn);
-        li.appendChild(delBtn);
-
-        li.addEventListener('mouseenter', () => {
-            editBtn.style.display = 'inline-block';
-            delBtn.style.display = 'inline-block';
-            li.style.background = '#e0e0e0';
-        });
-        li.addEventListener('mouseleave', () => {
-            editBtn.style.display = 'none';
-            delBtn.style.display = 'none';
-            li.style.background = '#f7f7f7';
-        });
-
+        
         floorList.appendChild(li);
     });
 }
 
+function updateSensorsList() {
+    const sensorsList = document.getElementById('sensorsList');
+    sensorsList.innerHTML = '';
+    
+    if (Object.keys(sensorsData).length === 0) {
+        sensorsList.innerHTML = '<li style="color:#888; padding:10px; font-size:0.9rem;">Нет датчиков</li>';
+        return;
+    }
+    
+    const placedSensors = currentViewFloorIdx !== null ? (sensorPositions[currentViewFloorIdx] || {}) : {};
+    
+    Object.entries(sensorsData).forEach(([sensorId, sData]) => {
+        const value = sData ? sData.value : null;
+        const isPlaced = sensorId in placedSensors;
+        
+        const li = document.createElement('li');
+        li.className = 'sensor-item' + (isPlaced ? ' placed' : '');
+        li.draggable = !isPlaced;
+        li.innerHTML = `
+            <strong>${sensorId}</strong><br>
+            ${value !== null ? value.toFixed(1) + '°C' : '—'}
+            ${isPlaced ? '<br><small>✓ на схеме</small>' : ''}
+            <button class="remove-btn" title="Убрать">✕</button>
+        `;
+        
+        if (isPlaced) {
+            li.querySelector('.remove-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                delete sensorPositions[currentViewFloorIdx][sensorId];
+                saveSensorPositionsToServer(currentViewFloorIdx);
+                updateSensorsList();
+                draw();
+            });
+        }
+        
+        li.addEventListener('dragstart', (e) => {
+            if (isPlaced) { e.preventDefault(); return; }
+            e.dataTransfer.setData('text/plain', JSON.stringify({type: 'sensor', id: sensorId}));
+        });
+        
+        sensorsList.appendChild(li);
+    });
+}
+
+function updateCamerasList() {
+    const camerasList = document.getElementById('camerasList');
+    camerasList.innerHTML = '';
+    
+    if (Object.keys(camerasData).length === 0) {
+        camerasList.innerHTML = '<li style="color:#888; padding:10px; font-size:0.9rem;">Нет камер</li>';
+        return;
+    }
+    
+    const placedCameras = currentViewFloorIdx !== null ? (cameraPositions[currentViewFloorIdx] || {}) : {};
+    
+    Object.entries(camerasData).forEach(([cameraId, cData]) => {
+        const count = cData ? cData.count : 0;
+        const isPlaced = cameraId in placedCameras;
+        
+        const li = document.createElement('li');
+        li.className = 'camera-item' + (isPlaced ? ' placed' : '');
+        li.draggable = !isPlaced;
+        li.innerHTML = `
+            <strong>${cameraId}</strong><br>
+            👥 ${count} чел.
+            ${isPlaced ? '<br><small>✓ на схеме</small>' : ''}
+            <button class="watch-btn" title="Смотреть видео">👁️ Смотреть</button>
+            <button class="remove-btn" title="Убрать">✕</button>
+        `;
+        
+        // Кнопка просмотра видео
+        li.querySelector('.watch-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            openVideoModal(cameraId);
+        });
+        
+        if (isPlaced) {
+            li.querySelector('.remove-btn').addEventListener('click', (e) => {
+                e.stopPropagation();
+                delete cameraPositions[currentViewFloorIdx][cameraId];
+                saveCameraPositionsToServer(currentViewFloorIdx);
+                updateCamerasList();
+                draw();
+            });
+        }
+        
+        li.addEventListener('dragstart', (e) => {
+            if (isPlaced) { e.preventDefault(); return; }
+            e.dataTransfer.setData('text/plain', JSON.stringify({type: 'camera', id: cameraId}));
+        });
+        
+        camerasList.appendChild(li);
+    });
+}
+
+// --- Функции просмотра видео с камеры ---
+let currentWatchingCamera = null;
+let videoUpdateCount = 0;
+let videoUpdateTimestamp = Date.now();
+
+function openVideoModal(cameraId) {
+    currentWatchingCamera = cameraId;
+    videoUpdateCount = 0;
+    videoUpdateTimestamp = Date.now();
+    
+    document.getElementById('videoModalCameraId').textContent = cameraId;
+    document.getElementById('videoModal').classList.add('active');
+    document.getElementById('videoFrame').style.display = 'none';
+    document.getElementById('videoNoFrame').style.display = 'flex';
+    document.getElementById('videoPersonCount').textContent = '0';
+    document.getElementById('videoFps').textContent = '-';
+    document.getElementById('videoLastUpdate').textContent = '-';
+    
+    // Запрашиваем последний кадр
+    fetchCameraFrame(cameraId);
+}
+
+function closeVideoModal() {
+    currentWatchingCamera = null;
+    document.getElementById('videoModal').classList.remove('active');
+}
+
+async function fetchCameraFrame(cameraId) {
+    if (!currentWatchingCamera || currentWatchingCamera !== cameraId) return;
+    
+    try {
+        const resp = await fetch(`${API_URL}/camera-stream/${cameraId}`, {headers: apiHeaders()});
+        if (resp.ok) {
+            const data = await resp.json();
+            updateVideoFrame(data);
+        }
+    } catch (e) {
+        console.error('Error fetching camera frame:', e);
+    }
+    
+    // Продолжаем обновление если модальное окно открыто
+    if (currentWatchingCamera === cameraId) {
+        setTimeout(() => fetchCameraFrame(cameraId), 200); // 5 FPS обновление
+    }
+}
+
+function updateVideoFrame(data) {
+    if (!data || !data.frame) return;
+    
+    const frameImg = document.getElementById('videoFrame');
+    const noFrame = document.getElementById('videoNoFrame');
+    
+    frameImg.src = 'data:image/jpeg;base64,' + data.frame;
+    frameImg.style.display = 'block';
+    noFrame.style.display = 'none';
+    
+    // Обновляем статистику
+    document.getElementById('videoPersonCount').textContent = data.count || 0;
+    
+    // Считаем FPS
+    videoUpdateCount++;
+    const now = Date.now();
+    const elapsed = (now - videoUpdateTimestamp) / 1000;
+    if (elapsed >= 1) {
+        const fps = (videoUpdateCount / elapsed).toFixed(1);
+        document.getElementById('videoFps').textContent = fps;
+        videoUpdateCount = 0;
+        videoUpdateTimestamp = now;
+    }
+    
+    // Время последнего обновления
+    const updateTime = new Date(data.timestamp * 1000);
+    document.getElementById('videoLastUpdate').textContent = updateTime.toLocaleTimeString();
+}
+
+// Закрытие модального окна
+document.getElementById('closeVideoModal').addEventListener('click', closeVideoModal);
+document.getElementById('videoModal').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('videoModal')) {
+        closeVideoModal();
+    }
+});
+
+// Обработка WebSocket событий для видео
+function setupVideoWebSocket() {
+    if (!socket) return;
+    
+    socket.on('camera_frame', (data) => {
+        if (data.school_id === SCHOOL_ID && data.camera_id === currentWatchingCamera) {
+            updateVideoFrame(data);
+        }
+    });
+}
+
+// --- Кнопки управления ---
+document.getElementById('newFloorBtn').addEventListener('click', () => {
+    savedFloors.push([]);
+    const newIdx = savedFloors.length - 1;
+    points = [];
+    currentViewFloorIdx = newIdx;
+    editingFloorIdx = newIdx;
+    renderFloorList();
+    draw();
+    updateSaveBtnState();
+    saveFloorsToServer();
+});
+
+document.getElementById('drawModeBtn').addEventListener('click', () => {
+    if (editingFloorIdx === null) {
+        alert('Сначала выберите этаж для редактирования (кнопка ✎)');
+        return;
+    }
+    drawMode = !drawMode;
+    document.getElementById('drawModeBtn').textContent = drawMode ? '✏️ Рисование: ВКЛ' : '✏️ Рисовать';
+});
+
+document.getElementById('saveBtn').addEventListener('click', () => {
+    if (points.length < 3) {
+        alert('Нарисуйте контур этажа (минимум 3 точки)');
+        return;
+    }
+    savedFloors[editingFloorIdx] = JSON.parse(JSON.stringify(points));
+    editingFloorIdx = null;
+    drawMode = false;
+    document.getElementById('drawModeBtn').textContent = '✏️ Рисовать';
+    renderFloorList();
+    saveFloorsToServer();
+    draw();
+    updateSaveBtnState();
+});
+
+document.getElementById('heatmapToggle').addEventListener('change', draw);
+document.getElementById('densityToggle').addEventListener('change', draw);
+
+// --- Canvas: рисование ---
+function isPointInPolygon(x, y, polygon) {
+    if (!polygon || polygon.length < 3) return false;
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+        const xi = polygon[i].x, yi = polygon[i].y;
+        const xj = polygon[j].x, yj = polygon[j].y;
+        const intersect = ((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+function interpolateValue(x, y, devices, getValue) {
+    if (devices.length === 0) return null;
+    if (devices.length === 1) return getValue(devices[0]);
+    
+    let sumWeights = 0;
+    let sumValues = 0;
+    const power = 2;
+    
+    for (const d of devices) {
+        const dx = x - d.x;
+        const dy = y - d.y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 1) return getValue(d);
+        const w = 1 / Math.pow(dist, power);
+        const val = getValue(d);
+        if (val !== null) {
+            sumWeights += w;
+            sumValues += w * val;
+        }
+    }
+    return sumWeights > 0 ? sumValues / sumWeights : null;
+}
+
+function drawHeatmap(type) {
+    if (points.length < 3 || currentViewFloorIdx === null) return;
+    
+    let devices = [];
+    let minVal, maxVal;
+    
+    if (type === 'temperature') {
+        const floorSensors = sensorPositions[currentViewFloorIdx] || {};
+        for (const [sensorId, pos] of Object.entries(floorSensors)) {
+            const sData = sensorsData[sensorId];
+            if (sData && sData.value !== null) {
+                devices.push({x: pos.x, y: pos.y, value: sData.value});
+            }
+        }
+        if (devices.length === 0) return;
+        const vals = devices.map(d => d.value);
+        minVal = Math.min(...vals);
+        maxVal = Math.max(...vals);
+        if (maxVal - minVal < 0.1) { minVal -= 5; maxVal += 5; }
+    } else {
+        const floorCameras = cameraPositions[currentViewFloorIdx] || {};
+        for (const [cameraId, pos] of Object.entries(floorCameras)) {
+            const cData = camerasData[cameraId];
+            devices.push({x: pos.x, y: pos.y, value: cData ? cData.count : 0});
+        }
+        if (devices.length === 0) return;
+        const vals = devices.map(d => d.value);
+        minVal = 0;
+        maxVal = Math.max(1, Math.max(...vals));
+    }
+    
+    const xs = points.map(p => p.x);
+    const ys = points.map(p => p.y);
+    const minX = Math.floor(Math.min(...xs));
+    const maxX = Math.ceil(Math.max(...xs));
+    const minY = Math.floor(Math.min(...ys));
+    const maxY = Math.ceil(Math.max(...ys));
+    
+    const step = 8;
+    
+    for (let y = minY; y <= maxY; y += step) {
+        for (let x = minX; x <= maxX; x += step) {
+            if (isPointInPolygon(x, y, points)) {
+                const val = interpolateValue(x, y, devices, d => d.value);
+                if (val === null) continue;
+                
+                const ratio = Math.max(0, Math.min(1, (val - minVal) / (maxVal - minVal)));
+                let hue;
+                if (type === 'temperature') {
+                    hue = (1 - ratio) * 240; // синий -> красный
+                } else {
+                    hue = (1 - ratio) * 120; // зелёный -> красный
+                }
+                
+                ctx.fillStyle = `hsla(${hue}, 80%, 50%, 0.3)`;
+                ctx.fillRect(x, y, step, step);
+            }
+        }
+    }
+}
+
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    // Draw lines
+    
+    // Тепловые карты (только в режиме просмотра)
+    if (editingFloorIdx === null && points.length > 2) {
+        if (document.getElementById('heatmapToggle').checked) {
+            drawHeatmap('temperature');
+        }
+        if (document.getElementById('densityToggle').checked) {
+            drawHeatmap('density');
+        }
+    }
+    
+    // Контур этажа
     if (points.length > 1) {
         ctx.beginPath();
         ctx.moveTo(points[0].x, points[0].y);
         for (let i = 1; i < points.length; i++) {
             ctx.lineTo(points[i].x, points[i].y);
         }
-        if (points.length > 2) {
-            ctx.lineTo(points[0].x, points[0].y); // close contour
-        }
-        // В режиме редактирования синие линии, иначе черные
-        ctx.strokeStyle = editingFloorIdx !== null ? '#0074D9' : '#000';
-        ctx.lineWidth = 6; // потолще
+        if (points.length > 2) ctx.lineTo(points[0].x, points[0].y);
+        ctx.strokeStyle = editingFloorIdx !== null ? '#0074D9' : '#333';
+        ctx.lineWidth = editingFloorIdx !== null ? 5 : 3;
         ctx.stroke();
     }
-    // Draw points (squares) только в режиме редактирования
+    
+    // Точки редактирования
     if (editingFloorIdx !== null) {
         for (let i = 0; i < points.length; i++) {
             const p = points[i];
-            let size = RADIUS * 2;
-            let half = RADIUS;
             ctx.beginPath();
-            if (i === selectedIdx) {
-                ctx.fillStyle = '#2ECC40'; // выделенная точка — зелёная
-            } else {
-                ctx.fillStyle = '#FF4136';
-            }
-            ctx.fillRect(p.x - half, p.y - half, size, size);
+            ctx.fillStyle = i === selectedIdx ? '#2ECC40' : '#FF4136';
+            ctx.fillRect(p.x - RADIUS, p.y - RADIUS, RADIUS * 2, RADIUS * 2);
             ctx.strokeStyle = '#333';
             ctx.lineWidth = 2;
-            ctx.strokeRect(p.x - half, p.y - half, size, size);
-            if (i === selectedIdx) {
-                ctx.lineWidth = 4;
-                ctx.strokeStyle = '#2ECC40';
-                ctx.strokeRect(p.x - half - 4, p.y - half - 4, size + 8, size + 8);
+            ctx.strokeRect(p.x - RADIUS, p.y - RADIUS, RADIUS * 2, RADIUS * 2);
+        }
+    }
+    
+    // Датчики температуры
+    if (currentViewFloorIdx !== null) {
+        const floorSensors = sensorPositions[currentViewFloorIdx] || {};
+        for (const [sensorId, pos] of Object.entries(floorSensors)) {
+            const sData = sensorsData[sensorId];
+            const value = sData ? sData.value : null;
+            
+            let fillColor = '#667eea';
+            if (value !== null) {
+                const ratio = Math.max(0, Math.min(1, (value - 10) / 40));
+                const hue = (1 - ratio) * 240;
+                fillColor = `hsl(${hue}, 85%, 55%)`;
             }
+            
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y, SENSOR_RADIUS, 0, Math.PI * 2);
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 10px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(value !== null ? `${value.toFixed(0)}°` : '?', pos.x, pos.y);
+        }
+        
+        // Камеры
+        const floorCameras = cameraPositions[currentViewFloorIdx] || {};
+        for (const [cameraId, pos] of Object.entries(floorCameras)) {
+            const cData = camerasData[cameraId];
+            const count = cData ? cData.count : 0;
+            
+            // Цвет камеры по количеству людей
+            let fillColor = '#27ae60'; // зелёный - мало людей
+            if (count > 10) fillColor = '#e74c3c'; // красный - много
+            else if (count > 5) fillColor = '#f39c12'; // оранжевый - средне
+            
+            // Иконка камеры (квадрат со скруглёнными углами)
+            ctx.beginPath();
+            ctx.roundRect(pos.x - CAMERA_RADIUS, pos.y - CAMERA_RADIUS/1.5, CAMERA_RADIUS * 2, CAMERA_RADIUS * 1.3, 5);
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Линза камеры
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y - 2, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#333';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(pos.x, pos.y - 2, 3, 0, Math.PI * 2);
+            ctx.fillStyle = '#fff';
+            ctx.fill();
+            
+            // Количество людей под камерой
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 12px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(`👥 ${count}`, pos.x, pos.y + CAMERA_RADIUS + 12);
         }
     }
 }
 
+// --- Canvas: взаимодействие ---
 function getPointIdx(x, y) {
     return points.findIndex(p => (p.x - x) ** 2 + (p.y - y) ** 2 < RADIUS ** 2);
 }
 
-canvas.addEventListener('mousedown', e => {
+function getDeviceAtPos(x, y) {
+    if (currentViewFloorIdx === null) return null;
+    
+    // Проверяем датчики
+    const floorSensors = sensorPositions[currentViewFloorIdx] || {};
+    for (const [sensorId, pos] of Object.entries(floorSensors)) {
+        if ((pos.x - x) ** 2 + (pos.y - y) ** 2 < SENSOR_RADIUS ** 2 * 1.5) {
+            return {type: 'sensor', id: sensorId, pos: pos};
+        }
+    }
+    
+    // Проверяем камеры
+    const floorCameras = cameraPositions[currentViewFloorIdx] || {};
+    for (const [cameraId, pos] of Object.entries(floorCameras)) {
+        if (Math.abs(pos.x - x) < CAMERA_RADIUS * 1.5 && Math.abs(pos.y - y) < CAMERA_RADIUS) {
+            return {type: 'camera', id: cameraId, pos: pos};
+        }
+    }
+    
+    return null;
+}
+
+// Функция для корректного получения координат с учётом масштаба canvas
+function getCanvasCoords(e) {
     const rect = canvas.getBoundingClientRect();
-    let x = e.clientX - rect.left;
-    let y = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+    };
+}
+
+canvas.addEventListener('mousedown', e => {
+    const coords = getCanvasCoords(e);
+    let x = coords.x;
+    let y = coords.y;
+    
+    // Проверяем клик на устройство для перетаскивания
+    const device = getDeviceAtPos(x, y);
+    if (device && editingFloorIdx === null) {
+        draggingDevice = device.id;
+        draggingDeviceType = device.type;
+        draggingDeviceOffset = {x: device.pos.x - x, y: device.pos.y - y};
+        canvas.style.cursor = 'grabbing';
+        return;
+    }
+    
+    // Редактирование точек контура
     const idx = getPointIdx(x, y);
-    if (idx !== -1) {
+    if (idx !== -1 && editingFloorIdx !== null) {
         draggingIdx = idx;
         selectedIdx = idx;
-        offset.x = points[idx].x - x;
-        offset.y = points[idx].y - y;
+        offset = {x: points[idx].x - x, y: points[idx].y - y};
         draw();
-    } else if (drawMode && editingFloorIdx !== null && (points.length === 0 || !isContourClosed())) {
-        // Если это не первая точка, корректируем координаты для перпендикулярности
+    } else if (drawMode && editingFloorIdx !== null) {
         if (points.length > 0) {
             const prev = points[points.length - 1];
-            // Определяем, по какой оси ближе — по X или по Y
-            if (Math.abs(x - prev.x) < Math.abs(y - prev.y)) {
-                x = prev.x; // вертикальная линия
-            } else {
-                y = prev.y; // горизонтальная линия
-            }
+            if (Math.abs(x - prev.x) < Math.abs(y - prev.y)) x = prev.x;
+            else y = prev.y;
         }
         points.push({x, y});
         selectedIdx = points.length - 1;
@@ -316,101 +1419,136 @@ canvas.addEventListener('mousedown', e => {
 });
 
 canvas.addEventListener('mousemove', e => {
+    const coords = getCanvasCoords(e);
+    let x = coords.x;
+    let y = coords.y;
+    
+    // Перетаскивание устройства
+    if (draggingDevice && currentViewFloorIdx !== null) {
+        const newX = x + draggingDeviceOffset.x;
+        const newY = y + draggingDeviceOffset.y;
+        
+        if (points.length >= 3 && isPointInPolygon(newX, newY, points)) {
+            if (draggingDeviceType === 'sensor') {
+                sensorPositions[currentViewFloorIdx][draggingDevice] = {x: newX, y: newY};
+            } else {
+                cameraPositions[currentViewFloorIdx][draggingDevice] = {x: newX, y: newY};
+            }
+            draw();
+        }
+        return;
+    }
+    
+    // Перетаскивание точки контура
     if (draggingIdx !== null && editingFloorIdx !== null) {
-        const rect = canvas.getBoundingClientRect();
-        let x = e.clientX - rect.left + offset.x;
-        let y = e.clientY - rect.top + offset.y;
-
-        // Перемещать можно в любое место, но если X или Y совпадает с другой точкой — прилипание
+        x = x + offset.x;
+        y = y + offset.y;
         const SNAP_DIST = 15;
         for (let i = 0; i < points.length; i++) {
             if (i === draggingIdx) continue;
-            if (Math.abs(x - points[i].x) < SNAP_DIST) {
-                x = points[i].x;
-            }
-            if (Math.abs(y - points[i].y) < SNAP_DIST) {
-                y = points[i].y;
-            }
+            if (Math.abs(x - points[i].x) < SNAP_DIST) x = points[i].x;
+            if (Math.abs(y - points[i].y) < SNAP_DIST) y = points[i].y;
         }
-
         points[draggingIdx] = {x, y};
         draw();
     }
 });
 
 canvas.addEventListener('mouseup', () => {
+    if (draggingDevice && currentViewFloorIdx !== null) {
+        if (draggingDeviceType === 'sensor') {
+            saveSensorPositionsToServer(currentViewFloorIdx);
+        } else {
+            saveCameraPositionsToServer(currentViewFloorIdx);
+        }
+        draggingDevice = null;
+        draggingDeviceType = null;
+        canvas.style.cursor = 'crosshair';
+    }
     draggingIdx = null;
 });
 
-// Удаление выделенной точки по клавише Delete
+canvas.addEventListener('mouseleave', () => {
+    if (draggingDevice) {
+        if (draggingDeviceType === 'sensor') {
+            saveSensorPositionsToServer(currentViewFloorIdx);
+        } else {
+            saveCameraPositionsToServer(currentViewFloorIdx);
+        }
+        draggingDevice = null;
+        draggingDeviceType = null;
+        canvas.style.cursor = 'crosshair';
+    }
+    draggingIdx = null;
+});
+
+// Drag & Drop с панели
+canvas.addEventListener('dragover', e => e.preventDefault());
+
+canvas.addEventListener('drop', e => {
+    e.preventDefault();
+    if (currentViewFloorIdx === null) return;
+    
+    try {
+        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+        const coords = getCanvasCoords(e);
+        const x = coords.x;
+        const y = coords.y;
+        
+        if (points.length >= 3 && isPointInPolygon(x, y, points)) {
+            if (data.type === 'sensor') {
+                if (!sensorPositions[currentViewFloorIdx]) sensorPositions[currentViewFloorIdx] = {};
+                sensorPositions[currentViewFloorIdx][data.id] = {x, y};
+                saveSensorPositionsToServer(currentViewFloorIdx);
+                updateSensorsList();
+            } else if (data.type === 'camera') {
+                if (!cameraPositions[currentViewFloorIdx]) cameraPositions[currentViewFloorIdx] = {};
+                cameraPositions[currentViewFloorIdx][data.id] = {x, y};
+                saveCameraPositionsToServer(currentViewFloorIdx);
+                updateCamerasList();
+            }
+            draw();
+        } else {
+            alert('Устройство можно разместить только внутри контура этажа!');
+        }
+    } catch (err) {
+        console.error('Drop error:', err);
+    }
+});
+
 document.addEventListener('keydown', e => {
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIdx !== null) {
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedIdx !== null && editingFloorIdx !== null) {
         points.splice(selectedIdx, 1);
         selectedIdx = null;
         draw();
     }
 });
 
-canvas.addEventListener('mouseleave', () => {
-    draggingIdx = null;
-});
-
-function isContourClosed() {
-    if (points.length < 3) return false;
-    const first = points[0];
-    const last = points[points.length - 1];
-    // Контур замкнут, если последняя точка совпадает с первой (или очень близко)
-    return Math.hypot(first.x - last.x, first.y - last.y) < RADIUS * 2;
-}
-
-draw();
-updateSaveBtnState();
-
-// --- Асинхронный опрос сервера для датчиков ---
-const SCHOOL_ID = 'school_1'; // id школы, для теста
-const API_URL = 'http://localhost:5000/sensor-data';
-const JWT_TOKEN = ''; // сюда можно вставить токен, если потребуется
-
-function fetchSensors() {
-    fetch(API_URL + '?sensor_id=', {
-        method: 'GET',
-        headers: {
-            'Authorization': 'Bearer ' + JWT_TOKEN
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        updateSensorsList(data.data);
-    })
-    .catch(err => {
-        sensorsList.innerHTML = '<li style="color:red;">Ошибка получения данных</li>';
-    });
-}
-
-function updateSensorsList(sensorsData) {
-    sensorsList.innerHTML = '';
-    if (!sensorsData || Object.keys(sensorsData).length === 0) {
-        sensorsList.innerHTML = '<li style="color:#888;">Нет данных</li>';
-        return;
+// --- Инициализация ---
+(async function init() {
+    // Проверяем сохранённую сессию
+    const savedToken = localStorage.getItem('jwt_token');
+    const savedSchoolId = localStorage.getItem('school_id');
+    const savedSchoolName = localStorage.getItem('school_name');
+    
+    if (savedToken && savedSchoolId) {
+        JWT_TOKEN = savedToken;
+        SCHOOL_ID = savedSchoolId;
+        SCHOOL_NAME = savedSchoolName || savedSchoolId;
+        
+        // Проверяем валидность токена
+        try {
+            const resp = await fetch(`${API_URL}/health`);
+            if (resp.ok) {
+                showMainScreen();
+                return;
+            }
+        } catch (e) {}
     }
-    Object.entries(sensorsData).forEach(([sensorId, queue]) => {
-        let last = queue.length ? queue[queue.length-1] : null;
-        let value = last ? last.value : '—';
-        let time = last ? new Date(last.timestamp*1000).toLocaleTimeString() : '';
-        const li = document.createElement('li');
-        li.style.padding = '8px 12px';
-        li.style.marginBottom = '6px';
-        li.style.background = '#f7f7f7';
-        li.style.borderRadius = '10px';
-        li.style.border = '1px solid #ddd';
-        li.textContent = `${sensorId}: ${value}°C ${time}`;
-        sensorsList.appendChild(li);
-    });
-}
-
-// Запуск периодического опроса
-setInterval(fetchSensors, 2000);
-fetchSensors();
+    
+    // Показываем экран авторизации
+    document.getElementById('authScreen').style.display = 'flex';
+})();
 </script>
 </body>
 </html>
